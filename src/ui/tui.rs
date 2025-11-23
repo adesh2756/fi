@@ -214,10 +214,20 @@ fn draw_ui(f: &mut ratatui::Frame, app: &mut AppState) {
         let list_items: Vec<ListItem> = items
             .iter()
             .map(|pkg| {
-                ListItem::new(Line::from(Span::raw(format!(
-                    "{} — {}  {}",
-                    pkg.name, pkg.identifier, pkg.description
-                ))))
+                // Format: name [version] — description
+                let version_info = pkg
+                    .version
+                    .as_ref()
+                    .map(|v| format!(" [{}]", v))
+                    .unwrap_or_default();
+                
+                let display_text = if pkg.description.is_empty() {
+                    format!("{}{}", pkg.name, version_info)
+                } else {
+                    format!("{}{} — {}", pkg.name, version_info, pkg.description)
+                };
+                
+                ListItem::new(Line::from(Span::raw(display_text)))
             })
             .collect();
 

@@ -1,9 +1,12 @@
+//! Flatpak backend for searching and installing Flatpak applications.
+
 use tokio::process::Command;
 use indicatif::ProgressBar;
 use async_trait::async_trait;
 use crate::models::result::SearchResult;
 use super::Backend;
 
+/// Backend implementation for the Flatpak package manager.
 pub struct FlatpakBackend;
 
 #[async_trait]
@@ -23,13 +26,14 @@ impl Backend for FlatpakBackend {
             .output()
             .await;
 
+        let results = if let Ok(out) = output {
+            parse_flatpak(&String::from_utf8_lossy(&out.stdout))
+        } else {
+            vec![]
+        };
+
         pb.finish_with_message("Flatpak search done");
-
-        if let Ok(out) = output {
-            return parse_flatpak(&String::from_utf8_lossy(&out.stdout));
-        }
-
-        vec![]
+        results
     }
 
     async fn install(&self, pkg: &SearchResult) -> Result<(), String> {

@@ -1,9 +1,12 @@
+//! DNF (Dandified YUM) backend for searching and installing RPM packages.
+
 use tokio::process::Command;
 use indicatif::ProgressBar;
 use async_trait::async_trait;
 use crate::models::result::SearchResult;
 use super::Backend;
 
+/// Backend implementation for the DNF package manager.
 pub struct DnfBackend;
 
 #[async_trait]
@@ -19,17 +22,20 @@ impl Backend for DnfBackend {
 
         let output = Command::new("dnf")
             .arg("search")
+            .arg("--assumeyes")
+            .arg("--setopt=assumeyes=True")
             .arg(query)
             .output()
             .await;
 
+        let results = if let Ok(out) = output {
+            parse_dnf(&String::from_utf8_lossy(&out.stdout))
+        } else {
+            vec![]
+        };
+
         pb.finish_with_message("DNF search done");
-
-        if let Ok(out) = output {
-            return parse_dnf(&String::from_utf8_lossy(&out.stdout));
-        }
-
-        vec![]
+        results
     }
 
     async fn install(&self, pkg: &SearchResult) -> Result<(), String> {

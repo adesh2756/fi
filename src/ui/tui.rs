@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use crossterm::{
     event::{self, Event, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::CrosstermBackend,
@@ -18,8 +19,7 @@ use crate::models::result::SearchResult;
 
 const MAX_SECTION_HEIGHT: u16 = 12;
 
-// ---------------------------------------------------------------------
-
+/// Application state for the TUI interface.
 pub struct AppState {
     pub sections: Vec<(String, Vec<SearchResult>)>,
     pub section_states: Vec<ListState>,
@@ -28,6 +28,11 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Creates a new application state with the given search result sections.
+    ///
+    /// # Arguments
+    ///
+    /// * `sections` - A vector of (backend_name, results) tuples
     pub fn new(sections: Vec<(String, Vec<SearchResult>)>) -> Self {
         let states = sections
             .iter()
@@ -49,29 +54,34 @@ impl AppState {
     }
 }
 
-// ---------------------------------------------------------------------
-
+/// Runs the TUI interface, allowing the user to browse and select packages.
+///
+/// # Arguments
+///
+/// * `app` - The application state containing search results
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the user exits or selects a package, or an error
+/// if something goes wrong with the terminal interface.
 pub fn run_tui(app: &mut AppState) -> io::Result<()> {
+    // Enter alternate screen mode and enable raw mode
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    
     let backend = CrosstermBackend::new(&mut stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    loop {
+    // Run the TUI loop
+    let result = loop {
         terminal.draw(|f| draw_ui(f, app))?;
 
         if event::poll(Duration::from_millis(200))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => {
-                        disable_raw_mode()?;
-                        crossterm::execute!(
-                            std::io::stdout(),
-                            crossterm::terminal::LeaveAlternateScreen,
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-                            crossterm::cursor::MoveTo(0, 0),
-                        )?;
-                        return Ok(());
+                        break Ok(());
                     }
 
                     KeyCode::Char('j') | KeyCode::Down => move_down(app),
@@ -87,14 +97,7 @@ pub fn run_tui(app: &mut AppState) -> io::Result<()> {
                     KeyCode::Enter => {
                         if let Some(item) = get_selected_item(app) {
                             app.selected_result = Some(item);
-                            disable_raw_mode()?;
-                            crossterm::execute!(
-                                std::io::stdout(),
-                                crossterm::terminal::LeaveAlternateScreen,
-                                crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-                                crossterm::cursor::MoveTo(0, 0),
-                            )?;
-                            return Ok(());
+                            break Ok(());
                         }
                     }
 
@@ -102,7 +105,16 @@ pub fn run_tui(app: &mut AppState) -> io::Result<()> {
                 }
             }
         }
-    }
+    };
+
+    // Drop terminal before leaving alternate screen
+    drop(terminal);
+    
+    // Always restore terminal state
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen)?;
+    
+    result
 }
 
 // ---------------------------------------------------------------------

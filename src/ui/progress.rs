@@ -1,3 +1,5 @@
+//! Progress indicators for concurrent backend searches.
+
 use indicatif::{MultiProgress, ProgressBar};
 use std::time::Duration;
 use futures::future::join_all;
@@ -5,6 +7,16 @@ use futures::future::join_all;
 use crate::backends::Backend;
 use crate::models::result::SearchResult;
 
+/// Runs searches across all backends concurrently with progress indicators.
+///
+/// # Arguments
+///
+/// * `query` - The search query string
+/// * `backends` - List of backends to search
+///
+/// # Returns
+///
+/// A combined vector of all search results from all backends.
 pub async fn run_search_with_progress(
     query: &str,
     backends: &Vec<Box<dyn Backend>>
@@ -22,7 +34,7 @@ pub async fn run_search_with_progress(
 
         async move {
             let results = backend.search(&q, pb.clone()).await;
-            pb.finish_with_message(format!("{} search done", name));
+            // Note: progress bar is already finished by the backend's search method
             (name, results)
         }
     });
